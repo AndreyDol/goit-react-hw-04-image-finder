@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
 import { GlobalStyle } from './GlobalStyle';
 import { Searchbar } from './Searchbar/Searchbar';
 import { Layout } from './Layout/Layout';
@@ -12,93 +12,87 @@ import { Loader } from './Loader/Loader';
 const ERROR_MSG =
   'Sorry, there are no images matching your search query. Please try again.';
 
-export class App extends Component {
-  state = {
-    request: null,
-    pictures: null,
-    page: 1,
-    isLoading: false,
-    error: null,
-    scroollHeightOld: 0,
-  };
+export const App =()=> {
+ 
+ const [request, setRequest] = useState('');
+    const [pictures, setPictures] = useState(null);
+    const [page, setPage] = useState(1);
+    const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [scroollHeightOld, setScroollHeightOld] = useState(0)
 
-  fetchImg = async () => {
-    try {
-      this.setState({ isLoading: true, error: null });
-      const search = await API.fetchImg(this.state.request, this.state.page);
+  useEffect(() => {
+    async function fetchImg() {
+      try {
+        setIsLoading(true);
+               setError(null);
+        const search = await API.fetchImg(request, page);
+        if (page === 1) {
+          setPictures(search.data);
+        } else {
+          setPictures(prevPictures => ({
+            ...prevPictures,
+            hits: [...prevPictures.hits, ...search.data.hits],
+          }));
+        }
 
-      //const hits = [...this.state.pictures.hits, ...search.data.hits];
-      if (this.state.page === 1) {
-        this.setState(state => ({
-          pictures: search.data,
-        }));
-      } else {
-        search.data.hits = [...this.state.pictures.hits, ...search.data.hits];
-        this.setState(state => ({
-          pictures: search.data,
-        }));
+        if (search.data.total === 0) {
+          setError(ERROR_MSG);
+        }
+      } catch (error) {
+        setError('Error, try reloading the page');
+      } finally {
+        setIsLoading(false);
       }
-      if (search.data.total === 0) {
-        this.setState({ error: ERROR_MSG });
-      }
-    } catch (error) {
-      this.setState({ error: 'Error, try reloading the page' });
-    } finally {
-      this.setState({ isLoading: false });
+    }
+   if (request !== '') fetchImg();
+  }, [request, page]);
+
+
+const onLoadMore = () => {
+  setPage(prevPage => prevPage + 1);
+  setScroollHeightOld(document.body.scrollHeight - 150);
+    };
+
+ const onSearch = (value) => {
+    setRequest(value.title.trim());
+   setPage(1);
+   setScroollHeightOld(0);
+    if (value.title.trim() === '')
+    {
+      setError(ERROR_MSG);
+      
     }
   };
+  
+useEffect(() => {
+  window.scrollTo({
+    top: scroollHeightOld,
+    behavior: 'smooth',
+  });
+}, [scroollHeightOld, pictures,request]);
 
-  onLoadMore = () => {
-    this.setState(state => ({
-      page: state.page + 1,
-      scroollHeightOld: document.body.scrollHeight,
-    }));
-  };
-
-  onSearch = value => {
-    this.setState(state => ({
-      request: value.title.trim(),
-      page: 1,
-       scroollHeightOld: 0,
-    }));
-    if (value.title.trim() === '') this.setState({ error: ERROR_MSG });
-  };
-
-  componentDidUpdate(prevProps, prevState) {
-   
-    if (
-      this.state.request !== '' &&
-      (prevState.request !== this.state.request ||
-        prevState.page !== this.state.page)
-    ) {
-      this.fetchImg();
-    }
-      window.scrollTo({
-      top: this.state.scroollHeightOld-150,
-    behavior:"smooth"});
-  }
-
-  render() {
+ 
     return (
       <Layout>
         <SearchbarWrap>
-          <Searchbar onSubmit={this.onSearch} />
+          <Searchbar onSubmit={onSearch} />
         </SearchbarWrap>
 
-        {!this.state.isLoading && this.state.error && (
-          <ErrorMessage>{this.state.error}</ErrorMessage>
+        {!isLoading && error && (
+          <ErrorMessage>{error}</ErrorMessage>
         )}
-        {!this.state.error && this.state.pictures && (
-          <ImageGallery pictures={this.state.pictures} />
+        {!error && pictures && (
+          <ImageGallery pictures={pictures} />
         )}
-        {this.state.isLoading && <Loader />}
-        {!this.state.isLoading &&
-          !this.state.error &&
-          this.state.pictures &&
-          this.state.pictures.total / 12 > this.state.page && (
+        {isLoading && <Loader />}
+        {!isLoading &&
+          !error &&
+          pictures &&
+          pictures.total / 12 > page && (
             <ButtonLoadMore
-              onClick={() => this.onLoadMore(this.state.page)}
-              page={this.state.page}
+              onClick={() => onLoadMore(page)}
+              page={page}
             >
               Load more
             </ButtonLoadMore>
@@ -108,4 +102,3 @@ export class App extends Component {
       </Layout>
     );
   }
-}
